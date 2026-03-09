@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-brand-50: #f5f8ff;
+  --color-brand-100: #eff4ff;
+  --color-brand-200: #d1e0ff;
+  --color-brand-300: #b2ccff;
+  --color-brand-400: #84adff;
+  --color-brand-500: #4482ff;
+  --color-brand-600: #2970ff;
+  --color-brand-700: #155eef;
+  --color-brand-800: #004eeb;
+  --color-brand-900: #0040c1;
+
+  --color-gray-50: #f9fafb;
+  --color-gray-100: #f2f4f7;
+  --color-gray-200: #eaecf0;
+  --color-gray-300: #d0d5dd;
+  --color-gray-400: #98a2b3;
+  --color-gray-500: #667085;
+  --color-gray-600: #475467;
+  --color-gray-700: #344054;
+  --color-gray-800: #1d2939;
+  --color-gray-900: #101828;
+}
+
+:root {
+  --untitled-ui-bg-primary: var(--color-gray-50);
+  --untitled-ui-bg-secondary: var(--color-gray-100);
+  --untitled-ui-bg-tertiary: var(--color-gray-800);
+  --untitled-ui-bg-invert: var(--color-gray-900);
+  --untitled-ui-bg-overlay: var(--color-gray-800);
+  --untitled-ui-border: var(--color-gray-200);
+  --untitled-ui-border-subtle: var(--color-gray-300);
+  --untitled-ui-text-primary: var(--color-gray-900);
+  --untitled-ui-text-secondary: var(--color-gray-600);
+  --untitled-ui-text-invert: var(--color-gray-50);
+  --untitled-ui-brand: var(--color-brand-600);
+  --untitled-ui-brand-hover: var(--color-brand-700);
+  --untitled-ui-visual-1: var(--color-brand-400);
+  --untitled-ui-visual-2: var(--color-gray-500);
+  --untitled-ui-visual-3: var(--color-brand-500);
+  --untitled-ui-visual-4: var(--color-brand-600);
+}
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900 font-sans antialiased;
+  }
+}
+
+@layer components {
+  .unt-card {
+    @apply bg-white border border-gray-200 rounded-xl;
+  }
+  
+  .unt-button-primary {
+    @apply bg-brand-600 text-white px-4 py-2.5 rounded-lg hover:bg-brand-700 transition-all font-semibold border border-brand-700 active:scale-[0.98] focus:ring-4 focus:ring-brand-100 focus:outline-none flex items-center justify-center gap-2;
+  }
+
+  .unt-button-secondary {
+    @apply bg-white text-gray-700 px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-all font-semibold border border-gray-300 active:scale-[0.98] focus:ring-4 focus:ring-gray-100 focus:outline-none flex items-center justify-center gap-2;
+  }
+  
+  .unt-input {
+    @apply border border-gray-300 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-4 focus:ring-brand-100 focus:border-brand-300 transition-all placeholder:text-gray-500;
+  }
+
+  .unt-badge {
+    @apply px-2 py-0.5 rounded-2xl text-xs font-medium border;
+  }
+}
