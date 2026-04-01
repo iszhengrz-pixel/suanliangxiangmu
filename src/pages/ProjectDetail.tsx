@@ -3518,15 +3518,14 @@ export default function ProjectDetail() {
             onCancel={handleCancelLink}
           />
         )}
-        
-        {/* AI Recognition Modal */}
+
         <AIRecognitionModal 
           isOpen={isAIModalOpen}
           onClose={() => setIsAIModalOpen(false)}
           fileName={currentCadFile?.name || ''}
           onLocateLayer={handleLocateLayer}
         />
-
+        
         {/* Plan Contour Modal */}
         <PlanContourModal
           isOpen={isPlanContourModalOpen}
