@@ -24,6 +24,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 import { Project, DxfFile } from '../types';
 
+const platformLogoUrl = '/platform-logo.png';
+
 const StatCard = ({ title, value, subtitle, icon: Icon }: { title: string, value: string, subtitle: string, icon: any }) => (
   <div className="unt-card p-6 flex items-center gap-4 flex-1 min-w-[280px]">
     <div className="w-12 h-12 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 border border-brand-100 shrink-0">
@@ -227,11 +229,11 @@ export default function Dashboard() {
       {/* Header */}
       <header className="h-18 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-20">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-brand-600 rounded-xl flex items-center justify-center text-white">
-            <LayoutGrid size={24} />
+          <div className="w-10 h-10 rounded-xl overflow-hidden border border-gray-100 bg-white flex items-center justify-center px-1">
+            <img src={platformLogoUrl} alt="AI算量系统" className="h-8 w-auto object-contain" />
           </div>
           <div className="flex flex-col">
-            <span className="text-lg font-bold text-gray-900 tracking-tight">结构设计管理系统</span>
+            <span className="text-lg font-bold text-gray-900 tracking-tight">AI算量系统</span>
             <span className="text-xs text-gray-500 font-medium">建筑数字化后台</span>
           </div>
         </div>

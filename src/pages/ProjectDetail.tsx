@@ -31,6 +31,9 @@ import {
   Sparkles,
   MapPin,
   AlertTriangle,
+  Scissors,
+  Copy,
+  CheckSquare,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
@@ -1025,6 +1028,10 @@ export default function ProjectDetail() {
   const [isCalculating, setIsCalculating] = useState(false);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [locatedLayer, setLocatedLayer] = useState<string | null>(null);
+  
+  // Multi-select state
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+  const [selectedMergeLayers, setSelectedMergeLayers] = useState<string[]>([]);
 
   const handleLocateLayer = (layerName: string) => {
     // Mock implementation: highlight/zoom to layer
@@ -1747,6 +1754,15 @@ export default function ProjectDetail() {
 
   const handleSegmentClick = (e: React.MouseEvent, segmentId: string, layerName: string) => {
       e.stopPropagation();
+      
+      if (isMultiSelectMode) {
+          const nextSelectedMergeLayers = selectedMergeLayers.includes(layerName)
+              ? selectedMergeLayers.filter(name => name !== layerName)
+              : [...selectedMergeLayers, layerName];
+          setSelectedMergeLayers(nextSelectedMergeLayers);
+          return;
+      }
+      
       if (!isExtractionMode) return;
 
       const isSelected = selectedSegmentIds.includes(segmentId);
@@ -3183,7 +3199,7 @@ export default function ProjectDetail() {
                 {/* SVG Layer for Segments */}
                 <svg className="absolute inset-0 w-full h-full z-10 pointer-events-none">
                     {mockSegments.map(seg => {
-                        const isSelected = selectedSegmentIds.includes(seg.id);
+                        const isSelected = selectedSegmentIds.includes(seg.id) || (isMultiSelectMode && selectedMergeLayers.includes(seg.layer));
                         const strokeColor = isSelected ? '#F900F9' : seg.color;
                         
                         if (seg.type === 'line') {
@@ -3269,18 +3285,75 @@ export default function ProjectDetail() {
           )}
 
           {/* Floating Controls (Bottom Center) */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-sm flex items-center p-1.5 gap-1 z-10">
-            <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="缩小">
-              <ZoomOut size={18} />
-            </button>
-            <div className="w-px h-4 bg-gray-200 mx-1" />
-            <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="适应屏幕">
-              <Maximize size={18} />
-            </button>
-            <div className="w-px h-4 bg-gray-200 mx-1" />
-            <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="放大">
-              <ZoomIn size={18} />
-            </button>
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3 z-10">
+            <AnimatePresence>
+              {isMultiSelectMode && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="bg-white border border-gray-200 px-4 py-2 rounded-lg shadow-lg flex items-center gap-4 text-sm font-medium text-gray-700"
+                >
+                  <span>已选中 {selectedMergeLayers.length} 个图层</span>
+                  <button 
+                    onClick={() => {
+                      if (selectedMergeLayers.length > 1) {
+                        // Here you would implement actual merge logic
+                        setSelectedMergeLayers([]);
+                        setIsMultiSelectMode(false);
+                      }
+                    }}
+                    disabled={selectedMergeLayers.length < 2}
+                    className="bg-brand-600 hover:bg-brand-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 border border-transparent text-white px-3 py-1.5 rounded transition-colors"
+                  >
+                    合并
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex items-center p-1.5 gap-1">
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="编辑">
+                <Edit2 size={18} />
+              </button>
+              <button 
+                onClick={() => {
+                  setIsMultiSelectMode(!isMultiSelectMode);
+                  if (isMultiSelectMode) {
+                    setSelectedMergeLayers([]);
+                  }
+                }}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isMultiSelectMode 
+                    ? "text-brand-600 bg-brand-50 hover:bg-brand-100" 
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                )} 
+                title="多选"
+              >
+                <CheckSquare size={18} />
+              </button>
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="分割">
+                <Scissors size={18} />
+              </button>
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="复制">
+                <Copy size={18} />
+              </button>
+              
+              <div className="w-px h-4 bg-gray-200 mx-1" />
+              
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="缩小">
+                <ZoomOut size={18} />
+              </button>
+              <div className="w-px h-4 bg-gray-200 mx-1" />
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="适应屏幕">
+                <Maximize size={18} />
+              </button>
+              <div className="w-px h-4 bg-gray-200 mx-1" />
+              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="放大">
+                <ZoomIn size={18} />
+              </button>
+            </div>
           </div>
         </div>
         </div>
