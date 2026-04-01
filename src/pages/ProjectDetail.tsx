@@ -35,6 +35,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
 import AIRecognitionModal from '../components/AIRecognitionModal';
+import PlanContourModal from '../components/PlanContourModal';
 
 // --- Types ---
 interface ConcreteGrade {
@@ -737,11 +738,10 @@ const BuildingSettingsModal: React.FC<{
               </div>
             ) : (
               <div className="rounded-lg border border-[var(--untitled-ui-border)] bg-white overflow-hidden">
-                <div className="grid grid-cols-[minmax(160px,1fr)_80px_80px_80px_160px] gap-2 px-3 py-2 bg-[var(--untitled-ui-bg-secondary)] text-xs font-medium text-[var(--untitled-ui-text-secondary)] border-b border-[var(--untitled-ui-border)]">
+                <div className="grid grid-cols-[minmax(160px,1fr)_80px_80px_160px] gap-2 px-3 py-2 bg-[var(--untitled-ui-bg-secondary)] text-xs font-medium text-[var(--untitled-ui-text-secondary)] border-b border-[var(--untitled-ui-border)]">
                   <div>楼层名称</div>
                   <div>层高(m)</div>
                   <div>标高(m)</div>
-                  <div>板厚(mm)</div>
                   <div>混凝土等级</div>
                 </div>
                 <div className="divide-y divide-[var(--untitled-ui-border)]">
@@ -750,7 +750,7 @@ const BuildingSettingsModal: React.FC<{
                     const gradeCount = (floor.floorDetails.concreteGrades || []).length;
                     return (
                       <div key={floor.id} className="bg-white">
-                        <div className="px-3 py-3 grid grid-cols-[minmax(160px,1fr)_80px_80px_80px_160px] gap-2 items-center">
+                        <div className="px-3 py-3 grid grid-cols-[minmax(160px,1fr)_80px_80px_160px] gap-2 items-center">
                           <input
                             type="text"
                             value={floor.name}
@@ -767,12 +767,6 @@ const BuildingSettingsModal: React.FC<{
                             type="text"
                             value={floor.floorDetails.elevation || ''}
                             onChange={(e) => updateFloorField(floor.id, 'elevation', e.target.value)}
-                            className="unt-input w-full text-sm bg-white"
-                          />
-                          <input
-                            type="text"
-                            value={floor.floorDetails.slabThickness || ''}
-                            onChange={(e) => updateFloorField(floor.id, 'slabThickness', e.target.value)}
                             className="unt-input w-full text-sm bg-white"
                           />
                           <button
@@ -1096,6 +1090,11 @@ export default function ProjectDetail() {
   const [isExitConfirmOpen, setIsExitConfirmOpen] = useState(false);
   const [is3DMode, setIs3DMode] = useState(false);
   const [selected3DId, setSelected3DId] = useState<string | null>(null);
+  const [is3DEntryDialogOpen, setIs3DEntryDialogOpen] = useState(false);
+  const [threeDTargetType, setThreeDTargetType] = useState<'building' | 'floor' | 'component'>('component');
+  const [threeDBuildingId, setThreeDBuildingId] = useState('');
+  const [threeDFloorId, setThreeDFloorId] = useState('');
+  const [threeDComponentId, setThreeDComponentId] = useState('');
   const [isPlanContourModalOpen, setIsPlanContourModalOpen] = useState(false);
   const [is2DUnderlayVisible, setIs2DUnderlayVisible] = useState(true);
   const [isShadowVisible, setIsShadowVisible] = useState(true);
@@ -1294,6 +1293,11 @@ export default function ProjectDetail() {
   const selectedFloor = floors.find(f => f.id === selectedFloorId) || floors[0] || null;
   const visibleTreeNodes = selectedFloor?.children || [];
   const componentCount = visibleTreeNodes.filter(node => node.type === 'component').length;
+  const threeDBuilding = buildings.find(b => b.id === threeDBuildingId) || null;
+  const threeDFloorOptions = (threeDBuilding?.children || []).filter(node => node.type === 'floor');
+  const threeDFloor = threeDFloorOptions.find(f => f.id === threeDFloorId) || null;
+  const threeDComponentOptions = (threeDFloor?.children || []).filter(node => node.type === 'component');
+  const threeDComponent = threeDComponentOptions.find(node => node.id === threeDComponentId) || null;
 
   React.useEffect(() => {
     if (buildings.length === 0) {
@@ -1781,8 +1785,35 @@ export default function ProjectDetail() {
     setIsOriginalLayerExpanded(!isOriginalLayerExpanded);
   };
 
-  const toggle3DMode = () => {
-    setIs3DMode(!is3DMode);
+  const handleOpen3DEntryDialog = () => {
+    if (!isCalculated || isCalculating) return;
+    const initialBuildingId = selectedBuilding?.id || buildings[0]?.id || '';
+    const initialBuilding = buildings.find(b => b.id === initialBuildingId) || null;
+    const initialFloors = (initialBuilding?.children || []).filter(node => node.type === 'floor');
+    const initialFloorId = selectedFloor?.id || initialFloors[0]?.id || '';
+    const initialFloor = initialFloors.find(f => f.id === initialFloorId) || null;
+    const initialComponents = (initialFloor?.children || []).filter(node => node.type === 'component');
+    const initialComponentId = selectedComponent?.id || initialComponents[0]?.id || '';
+    setThreeDTargetType('component');
+    setThreeDBuildingId(initialBuildingId);
+    setThreeDFloorId(initialFloorId);
+    setThreeDComponentId(initialComponentId);
+    setIs3DEntryDialogOpen(true);
+  };
+
+  const handleConfirmEnter3DMode = () => {
+    if (threeDTargetType === 'component' && threeDComponent) {
+      setSelectedComponent(threeDComponent);
+      setSelected3DId('jll9');
+    } else {
+      setSelected3DId(null);
+    }
+    setIs3DMode(true);
+    setIs3DEntryDialogOpen(false);
+  };
+
+  const handleExit3DMode = () => {
+    setIs3DMode(false);
     setSelected3DId(null);
   };
 
@@ -2765,6 +2796,15 @@ export default function ProjectDetail() {
             <div className="bg-white/80 backdrop-blur border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm text-xs font-mono text-gray-600">
               X: -31023, Y: 43624
             </div>
+            {is3DMode && (
+              <button
+                onClick={handleExit3DMode}
+                className="bg-white/80 backdrop-blur border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm text-sm font-medium text-gray-700 hover:bg-white transition-colors flex items-center gap-2"
+              >
+                <X size={16} />
+                退出3D
+              </button>
+            )}
             {isSelecting && (
               <button
                 onClick={handleExitSelection}
@@ -2774,16 +2814,6 @@ export default function ProjectDetail() {
                 退出关联
               </button>
             )}
-            <button 
-              onClick={toggle3DMode}
-              className={cn(
-                "bg-white/80 backdrop-blur border border-gray-200 px-3 py-1.5 rounded-lg shadow-sm text-sm font-medium transition-colors flex items-center gap-2",
-                is3DMode ? "text-brand-600 bg-brand-50 border-brand-200" : "text-gray-700 hover:bg-white"
-              )}
-            >
-              <Box size={16} />
-              {is3DMode ? "退出3D" : "进入3D"}
-            </button>
           </div>
 
           {/* Canvas Placeholder (Simulating CAD drawing) */}
@@ -3274,7 +3304,24 @@ export default function ProjectDetail() {
           <div className="flex-1 overflow-y-auto p-4 space-y-6">
             
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-gray-900">当前构件</h3>
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">当前构件</h3>
+                <button
+                  onClick={handleOpen3DEntryDialog}
+                  disabled={!isCalculated || isCalculating}
+                  className={cn(
+                    "px-3 py-1.5 rounded-md text-xs font-semibold transition-all border flex items-center gap-1.5 shadow-sm",
+                    (!isCalculated || isCalculating)
+                      ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                      : is3DMode
+                        ? "bg-brand-600 text-white border-brand-600 hover:bg-brand-700"
+                        : "bg-brand-50 text-brand-700 border-brand-200 hover:bg-brand-100"
+                  )}
+                >
+                  <Box size={15} />
+                  3D模式
+                </button>
+              </div>
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
                 <span className="text-base font-bold text-blue-700">1#楼-屋面层-梁</span>
               </div>
@@ -3409,8 +3456,8 @@ export default function ProjectDetail() {
 
                  <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 cursor-pointer hover:border-brand-200 transition-colors group" onClick={() => setIsPlanContourModalOpen(true)}>
                     <div className="text-xs font-medium text-gray-500 mb-2">平面轮廓</div>
-                    <div className="h-24 bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden group-hover:shadow-md transition-shadow">
-                        <div className="w-3/4 h-2 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.5)]"></div>
+                    <div className="h-24 bg-white border border-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden group-hover:shadow-md transition-shadow">
+                        <div className="w-3/4 h-2 bg-brand-600 rounded-full"></div>
                     </div>
                  </div>
 
@@ -3479,6 +3526,136 @@ export default function ProjectDetail() {
           fileName={currentCadFile?.name || ''}
           onLocateLayer={handleLocateLayer}
         />
+
+        {/* Plan Contour Modal */}
+        <PlanContourModal
+          isOpen={isPlanContourModalOpen}
+          onClose={() => setIsPlanContourModalOpen(false)}
+          area="2400000 mm²"
+          volume="1.440 m³"
+          scale="1mm = 1.390px"
+        />
+
+        <AnimatePresence>
+          {is3DEntryDialogOpen && (
+            <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+                  <h3 className="font-semibold text-sm text-gray-900">选择进入3D模式范围</h3>
+                  <button
+                    onClick={() => setIs3DEntryDialogOpen(false)}
+                    className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    {[
+                      { key: 'building', label: '楼栋' },
+                      { key: 'floor', label: '楼层' },
+                      { key: 'component', label: '构建' }
+                    ].map(option => (
+                      <button
+                        key={option.key}
+                        onClick={() => setThreeDTargetType(option.key as 'building' | 'floor' | 'component')}
+                        className={cn(
+                          "flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors",
+                          threeDTargetType === option.key
+                            ? "bg-brand-50 text-brand-700 border-brand-200"
+                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-gray-600">楼栋</label>
+                      <select
+                        value={threeDBuildingId}
+                        onChange={(e) => {
+                          const nextBuildingId = e.target.value;
+                          const nextBuilding = buildings.find(b => b.id === nextBuildingId) || null;
+                          const nextFloors = (nextBuilding?.children || []).filter(node => node.type === 'floor');
+                          const nextFloorId = nextFloors[0]?.id || '';
+                          const nextFloor = nextFloors.find(f => f.id === nextFloorId) || null;
+                          const nextComponents = (nextFloor?.children || []).filter(node => node.type === 'component');
+                          setThreeDBuildingId(nextBuildingId);
+                          setThreeDFloorId(nextFloorId);
+                          setThreeDComponentId(nextComponents[0]?.id || '');
+                        }}
+                        className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                      >
+                        {buildings.map(b => (
+                          <option key={b.id} value={b.id}>{b.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {(threeDTargetType === 'floor' || threeDTargetType === 'component') && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">楼层</label>
+                        <select
+                          value={threeDFloorId}
+                          onChange={(e) => {
+                            const nextFloorId = e.target.value;
+                            const nextFloor = threeDFloorOptions.find(f => f.id === nextFloorId) || null;
+                            const nextComponents = (nextFloor?.children || []).filter(node => node.type === 'component');
+                            setThreeDFloorId(nextFloorId);
+                            setThreeDComponentId(nextComponents[0]?.id || '');
+                          }}
+                          className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                        >
+                          {threeDFloorOptions.map(f => (
+                            <option key={f.id} value={f.id}>{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {threeDTargetType === 'component' && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-gray-600">构建</label>
+                        <select
+                          value={threeDComponentId}
+                          onChange={(e) => setThreeDComponentId(e.target.value)}
+                          className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
+                        >
+                          {threeDComponentOptions.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => setIs3DEntryDialogOpen(false)}
+                      className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleConfirmEnter3DMode}
+                      className="flex-1 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors"
+                    >
+                      进入3D模式
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         {/* Add Category Modal */}
         <AnimatePresence>
