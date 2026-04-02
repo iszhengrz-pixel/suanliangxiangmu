@@ -1032,6 +1032,9 @@ export default function ProjectDetail() {
   // Multi-select state
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [selectedMergeLayers, setSelectedMergeLayers] = useState<string[]>([]);
+  
+  // Edit state
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const handleLocateLayer = (layerName: string) => {
     // Mock implementation: highlight/zoom to layer
@@ -3292,9 +3295,9 @@ export default function ProjectDetail() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="bg-white border border-gray-200 px-4 py-2 rounded-lg shadow-lg flex items-center gap-4 text-sm font-medium text-gray-700"
+                  className="bg-white border border-gray-200 px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-4 text-sm font-medium text-gray-700 h-9"
                 >
-                  <span>已选中 {selectedMergeLayers.length} 个图层</span>
+                  <span className="text-xs leading-none">已选中 {selectedMergeLayers.length} 个图层</span>
                   <button 
                     onClick={() => {
                       if (selectedMergeLayers.length > 1) {
@@ -3304,16 +3307,55 @@ export default function ProjectDetail() {
                       }
                     }}
                     disabled={selectedMergeLayers.length < 2}
-                    className="bg-brand-600 hover:bg-brand-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 border border-transparent text-white px-3 py-1.5 rounded transition-colors"
+                    className="bg-brand-600 hover:bg-brand-700 disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200 border border-transparent text-white px-2.5 py-1 rounded transition-colors text-xs flex items-center justify-center h-6"
                   >
                     合并
+                  </button>
+                </motion.div>
+              )}
+              {isEditMode && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="bg-white border border-gray-200 px-2 py-1.5 rounded-lg shadow-lg flex items-center gap-1 text-sm font-medium text-gray-700 h-9"
+                >
+                  <button 
+                    className="px-2 py-1 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors flex items-center justify-center gap-1.5 h-6"
+                    title="复制"
+                  >
+                    <Copy size={14} />
+                    <span className="text-xs leading-none">复制</span>
+                  </button>
+                  <div className="w-px h-3.5 bg-gray-200 mx-0.5" />
+                  <button 
+                    className="px-2 py-1 text-gray-500 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors flex items-center justify-center gap-1.5 h-6"
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                    <span className="text-xs leading-none">删除</span>
                   </button>
                 </motion.div>
               )}
             </AnimatePresence>
 
             <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex items-center p-1.5 gap-1">
-              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="编辑">
+              <button 
+                onClick={() => {
+                  setIsEditMode(!isEditMode);
+                  if (!isEditMode) {
+                    setIsMultiSelectMode(false);
+                    setSelectedMergeLayers([]);
+                  }
+                }}
+                className={cn(
+                  "p-2 rounded-lg transition-colors",
+                  isEditMode 
+                    ? "text-brand-600 bg-brand-50 hover:bg-brand-100" 
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+                )} 
+                title="编辑"
+              >
                 <Edit2 size={18} />
               </button>
               <button 
@@ -3321,6 +3363,8 @@ export default function ProjectDetail() {
                   setIsMultiSelectMode(!isMultiSelectMode);
                   if (isMultiSelectMode) {
                     setSelectedMergeLayers([]);
+                  } else {
+                    setIsEditMode(false);
                   }
                 }}
                 className={cn(
@@ -3335,9 +3379,6 @@ export default function ProjectDetail() {
               </button>
               <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="分割">
                 <Scissors size={18} />
-              </button>
-              <button className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors" title="复制">
-                <Copy size={18} />
               </button>
               
               <div className="w-px h-4 bg-gray-200 mx-1" />
