@@ -279,7 +279,7 @@ export default function Dashboard() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 p-8 max-w-[1600px] mx-auto w-full space-y-8">
+      <main className="flex-1 p-8 max-w-[1440px] mx-auto w-full space-y-8">
         {/* Page Title */}
         <div className="flex justify-between items-end">
           <div className="space-y-1">

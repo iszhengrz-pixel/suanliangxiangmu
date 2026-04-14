@@ -34,6 +34,7 @@ import {
   Scissors,
   Copy,
   CheckSquare,
+  Minus,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../utils';
@@ -1102,9 +1103,10 @@ export default function ProjectDetail() {
   const [selected3DId, setSelected3DId] = useState<string | null>(null);
   const [is3DEntryDialogOpen, setIs3DEntryDialogOpen] = useState(false);
   const [threeDTargetType, setThreeDTargetType] = useState<'building' | 'floor' | 'component'>('component');
-  const [threeDBuildingId, setThreeDBuildingId] = useState('');
-  const [threeDFloorId, setThreeDFloorId] = useState('');
-  const [threeDComponentId, setThreeDComponentId] = useState('');
+  const [threeDCheckedIds, setThreeDCheckedIds] = useState<string[]>([]);
+  const [threeDViewingBuildingId, setThreeDViewingBuildingId] = useState<string>('');
+  const [threeDViewingFloorId, setThreeDViewingFloorId] = useState<string>('');
+  const [dialogMode, setDialogMode] = useState<'3d' | 'calculate'>('3d');
   const [isPlanContourModalOpen, setIsPlanContourModalOpen] = useState(false);
   const [is2DUnderlayVisible, setIs2DUnderlayVisible] = useState(true);
   const [isShadowVisible, setIsShadowVisible] = useState(true);
@@ -1303,11 +1305,114 @@ export default function ProjectDetail() {
   const selectedFloor = floors.find(f => f.id === selectedFloorId) || floors[0] || null;
   const visibleTreeNodes = selectedFloor?.children || [];
   const componentCount = visibleTreeNodes.filter(node => node.type === 'component').length;
-  const threeDBuilding = buildings.find(b => b.id === threeDBuildingId) || null;
-  const threeDFloorOptions = (threeDBuilding?.children || []).filter(node => node.type === 'floor');
-  const threeDFloor = threeDFloorOptions.find(f => f.id === threeDFloorId) || null;
-  const threeDComponentOptions = (threeDFloor?.children || []).filter(node => node.type === 'component');
-  const threeDComponent = threeDComponentOptions.find(node => node.id === threeDComponentId) || null;
+  const threeDFloorOptions = buildings
+    .filter(b => b.id === threeDViewingBuildingId)
+    .flatMap(b => b.children || [])
+    .filter(node => node.type === 'floor');
+  const threeDComponentOptions = threeDFloorOptions
+    .filter(f => f.id === threeDViewingFloorId)
+    .flatMap(f => f.children || [])
+    .filter(node => node.type === 'component');
+
+  // --- 3D Checkbox Logic ---
+  const handleThreeDCheckToggle = (nodeId: string, isChecking: boolean) => {
+    setThreeDCheckedIds(prev => {
+      const next = new Set(prev);
+      
+      const findNode = (id: string): TreeNodeData | null => {
+        for (const b of buildings) {
+          if (b.id === id) return b;
+          for (const f of b.children || []) {
+            if (f.id === id) return f;
+            for (const c of f.children || []) {
+              if (c.id === id) return c;
+            }
+          }
+        }
+        return null;
+      };
+
+      const getAllDescendantIds = (node: TreeNodeData): string[] => {
+        let ids: string[] = [];
+        if (node.children) {
+          node.children.forEach(child => {
+            ids.push(child.id);
+            ids = ids.concat(getAllDescendantIds(child));
+          });
+        }
+        return ids;
+      };
+
+      const getParentId = (targetId: string): string | null => {
+        for (const b of buildings) {
+          if (b.children?.some(f => f.id === targetId)) return b.id;
+          for (const f of b.children || []) {
+            if (f.children?.some(c => c.id === targetId)) return f.id;
+          }
+        }
+        return null;
+      };
+
+      const targetNode = findNode(nodeId);
+      if (!targetNode) return prev;
+
+      // 1. Check/uncheck target and all descendants
+      const descendants = getAllDescendantIds(targetNode);
+      const toModify = [nodeId, ...descendants];
+      toModify.forEach(id => isChecking ? next.add(id) : next.delete(id));
+
+      // 2. Cascade up
+      let currentParentId = getParentId(nodeId);
+      while (currentParentId) {
+        const parentNode = findNode(currentParentId);
+        if (parentNode && parentNode.children) {
+          const allChildrenChecked = parentNode.children.length > 0 && parentNode.children.every(child => next.has(child.id));
+          if (isChecking && allChildrenChecked) {
+            next.add(currentParentId);
+          } else if (!isChecking) {
+            next.delete(currentParentId);
+          }
+        }
+        currentParentId = getParentId(currentParentId);
+      }
+
+      return Array.from(next);
+    });
+  };
+
+  const isThreeDNodeIndeterminate = (nodeId: string): boolean => {
+    if (threeDCheckedIds.includes(nodeId)) return false;
+    
+    const findNode = (id: string): TreeNodeData | null => {
+      for (const b of buildings) {
+        if (b.id === id) return b;
+        for (const f of b.children || []) {
+          if (f.id === id) return f;
+          for (const c of f.children || []) {
+            if (c.id === id) return c;
+          }
+        }
+      }
+      return null;
+    };
+    
+    const getAllDescendantIds = (node: TreeNodeData): string[] => {
+      let ids: string[] = [];
+      if (node.children) {
+        node.children.forEach(child => {
+          ids.push(child.id);
+          ids = ids.concat(getAllDescendantIds(child));
+        });
+      }
+      return ids;
+    };
+
+    const node = findNode(nodeId);
+    if (!node) return false;
+    const descendants = getAllDescendantIds(node);
+    // It's indeterminate if ANY descendant is checked, but not ALL (since it's not fully checked)
+    return descendants.some(id => threeDCheckedIds.includes(id));
+  };
 
   React.useEffect(() => {
     if (buildings.length === 0) {
@@ -1678,7 +1783,29 @@ export default function ProjectDetail() {
     console.log('Exporting...');
   };
 
-  const handleCalculate = () => {
+  const handleCalculateClick = () => {
+    setDialogMode('calculate');
+    
+    const initialBuildingId = selectedBuilding?.id || buildings[0]?.id || '';
+    const initialFloorId = selectedFloor?.id || '';
+    const initialComponentId = selectedComponent?.id || '';
+
+    setThreeDViewingBuildingId(initialBuildingId);
+    setThreeDViewingFloorId(initialFloorId);
+    
+    // Auto-check ONLY the currently selected component
+    const initialChecked = new Set<string>();
+    if (initialComponentId) {
+      initialChecked.add(initialComponentId);
+      if (initialFloorId) initialChecked.add(initialFloorId);
+      if (initialBuildingId) initialChecked.add(initialBuildingId);
+    }
+    
+    setThreeDCheckedIds(Array.from(initialChecked));
+    setIs3DEntryDialogOpen(true);
+  };
+
+  const executeCalculation = () => {
     setIsCalculating(true);
     setIsCalculated(false);
     // Simulate calculation
@@ -1806,6 +1933,7 @@ export default function ProjectDetail() {
 
   const handleOpen3DEntryDialog = () => {
     if (!isCalculated || isCalculating) return;
+    setDialogMode('3d');
     const initialBuildingId = selectedBuilding?.id || buildings[0]?.id || '';
     const initialBuilding = buildings.find(b => b.id === initialBuildingId) || null;
     const initialFloors = (initialBuilding?.children || []).filter(node => node.type === 'floor');
@@ -1813,22 +1941,43 @@ export default function ProjectDetail() {
     const initialFloor = initialFloors.find(f => f.id === initialFloorId) || null;
     const initialComponents = (initialFloor?.children || []).filter(node => node.type === 'component');
     const initialComponentId = selectedComponent?.id || initialComponents[0]?.id || '';
-    setThreeDTargetType('component');
-    setThreeDBuildingId(initialBuildingId);
-    setThreeDFloorId(initialFloorId);
-    setThreeDComponentId(initialComponentId);
+    setThreeDViewingBuildingId(initialBuildingId);
+    setThreeDViewingFloorId(initialFloorId);
+    
+    // Auto-check the initially active component context if needed
+    const initialChecked = new Set<string>();
+    if (initialComponentId) {
+      initialChecked.add(initialComponentId);
+      initialChecked.add(initialFloorId);
+      initialChecked.add(initialBuildingId);
+    }
+    setThreeDCheckedIds(Array.from(initialChecked));
+    
     setIs3DEntryDialogOpen(true);
   };
 
-  const handleConfirmEnter3DMode = () => {
-    if (threeDTargetType === 'component' && threeDComponent) {
-      setSelectedComponent(threeDComponent);
-      setSelected3DId('jll9');
+  const handleConfirmDialogAction = () => {
+    if (dialogMode === '3d') {
+      // Determine the actual component to enter 3D with based on selections.
+      // Use the first checked component
+      const checkedComponents = treeData
+        .flatMap(b => b.children || [])
+        .flatMap(f => f.children || [])
+        .filter(c => c.type === 'component' && threeDCheckedIds.includes(c.id));
+      const primaryComponent = checkedComponents[0] || null;
+
+      if (primaryComponent) {
+        setSelectedComponent(primaryComponent);
+        setSelected3DId('jll9');
+      } else {
+        setSelected3DId(null);
+      }
+      setIs3DMode(true);
+      setIs3DEntryDialogOpen(false);
     } else {
-      setSelected3DId(null);
+      setIs3DEntryDialogOpen(false);
+      executeCalculation();
     }
-    setIs3DMode(true);
-    setIs3DEntryDialogOpen(false);
   };
 
   const handleExit3DMode = () => {
@@ -3443,11 +3592,11 @@ export default function ProjectDetail() {
 
             <div className="flex gap-2 pt-2">
               <button 
-                onClick={handleCalculate}
+                onClick={handleCalculateClick}
                 disabled={isCalculating}
                 className={cn(
                   "flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
-                  isCalculating 
+                  isCalculating
                     ? "bg-gray-100 text-gray-400 cursor-not-allowed" 
                     : "bg-brand-600 text-white hover:bg-brand-700 shadow-sm"
                 )}
@@ -3653,117 +3802,191 @@ export default function ProjectDetail() {
           {is3DEntryDialogOpen && (
             <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
               <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100"
+                initial={{ opacity: 0, scale: 0.96, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 20 }}
+                className="bg-white rounded-xl shadow-xl w-full max-w-5xl h-[700px] flex flex-col overflow-hidden border border-gray-200"
               >
-                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
-                  <h3 className="font-semibold text-sm text-gray-900">选择进入3D模式范围</h3>
-                  <button
-                    onClick={() => setIs3DEntryDialogOpen(false)}
-                    className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="p-4 space-y-4">
-                  <div className="flex items-center gap-2">
-                    {[
-                      { key: 'building', label: '楼栋' },
-                      { key: 'floor', label: '楼层' },
-                      { key: 'component', label: '构建' }
-                    ].map(option => (
-                      <button
-                        key={option.key}
-                        onClick={() => setThreeDTargetType(option.key as 'building' | 'floor' | 'component')}
-                        className={cn(
-                          "flex-1 py-1.5 rounded-md text-xs font-medium border transition-colors",
-                          threeDTargetType === option.key
-                            ? "bg-brand-50 text-brand-700 border-brand-200"
-                            : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                        )}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1.5 h-5 bg-brand-600 rounded-full" />
+                    <h3 className="font-bold text-lg text-gray-900">{dialogMode === '3d' ? '3D模式展示范围' : '计算范围'}</h3>
                   </div>
-
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-medium text-gray-600">楼栋</label>
-                      <select
-                        value={threeDBuildingId}
-                        onChange={(e) => {
-                          const nextBuildingId = e.target.value;
-                          const nextBuilding = buildings.find(b => b.id === nextBuildingId) || null;
-                          const nextFloors = (nextBuilding?.children || []).filter(node => node.type === 'floor');
-                          const nextFloorId = nextFloors[0]?.id || '';
-                          const nextFloor = nextFloors.find(f => f.id === nextFloorId) || null;
-                          const nextComponents = (nextFloor?.children || []).filter(node => node.type === 'component');
-                          setThreeDBuildingId(nextBuildingId);
-                          setThreeDFloorId(nextFloorId);
-                          setThreeDComponentId(nextComponents[0]?.id || '');
-                        }}
-                        className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
-                      >
-                        {buildings.map(b => (
-                          <option key={b.id} value={b.id}>{b.name}</option>
-                        ))}
-                      </select>
+                  <div className="flex items-center gap-4">
+                    <div className="relative w-64 group">
+                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
+                      <input 
+                        type="text" 
+                        placeholder="搜索展示项..." 
+                        className="w-full h-9 pl-9 pr-3 text-sm bg-gray-50 border border-transparent hover:border-gray-200 focus:bg-white focus:border-brand-300 focus:ring-2 focus:ring-brand-100 rounded-lg transition-all outline-none"
+                      />
                     </div>
-
-                    {(threeDTargetType === 'floor' || threeDTargetType === 'component') && (
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-gray-600">楼层</label>
-                        <select
-                          value={threeDFloorId}
-                          onChange={(e) => {
-                            const nextFloorId = e.target.value;
-                            const nextFloor = threeDFloorOptions.find(f => f.id === nextFloorId) || null;
-                            const nextComponents = (nextFloor?.children || []).filter(node => node.type === 'component');
-                            setThreeDFloorId(nextFloorId);
-                            setThreeDComponentId(nextComponents[0]?.id || '');
-                          }}
-                          className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
-                        >
-                          {threeDFloorOptions.map(f => (
-                            <option key={f.id} value={f.id}>{f.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    {threeDTargetType === 'component' && (
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-gray-600">构建</label>
-                        <select
-                          value={threeDComponentId}
-                          onChange={(e) => setThreeDComponentId(e.target.value)}
-                          className="w-full h-9 rounded-md border border-gray-200 px-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200"
-                        >
-                          {threeDComponentOptions.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
                     <button
                       onClick={() => setIs3DEntryDialogOpen(false)}
-                      className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                      className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
                     >
-                      取消
-                    </button>
-                    <button
-                      onClick={handleConfirmEnter3DMode}
-                      className="flex-1 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors"
-                    >
-                      进入3D模式
+                      <X size={18} />
                     </button>
                   </div>
+                </div>
+
+                {/* Body */}
+                <div className="flex flex-1 overflow-hidden bg-gray-50">
+                  {/* Left Column: Buildings (1st Level) */}
+                  <div className="w-[280px] bg-white border-r border-gray-100 flex flex-col shrink-0">
+                    <div className="p-3 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                      <h4 className="text-gray-900 font-bold text-sm">选择楼栋</h4>
+                    </div>
+                    <div className="flex-1 overflow-y-auto py-1">
+                      {buildings.map(b => {
+                        const isChecked = threeDCheckedIds.includes(b.id);
+                        const isIndeterminate = isThreeDNodeIndeterminate(b.id);
+                        const isViewing = threeDViewingBuildingId === b.id;
+                        return (
+                          <div 
+                            key={b.id}
+                            onClick={() => {
+                              setThreeDViewingBuildingId(b.id);
+                              // Auto select first floor of this building to view
+                              const nextFloors = (b.children || []).filter(node => node.type === 'floor');
+                              if (nextFloors.length > 0) setThreeDViewingFloorId(nextFloors[0].id);
+                            }}
+                            className={cn(
+                              "flex items-center justify-between px-4 py-2.5 text-sm transition-all relative group cursor-pointer",
+                              isViewing
+                                ? "bg-brand-50/50 text-brand-700 font-semibold" 
+                                : "text-gray-600 hover:bg-gray-50 font-medium"
+                            )}
+                          >
+                            {isViewing && (
+                              <motion.div 
+                                layoutId="activeBuilding"
+                                className="absolute left-0 top-0 bottom-0 w-1 bg-brand-600"
+                              />
+                            )}
+                            <span>{b.name}</span>
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleThreeDCheckToggle(b.id, !isChecked);
+                              }}
+                              className={cn(
+                                "w-4 h-4 rounded flex items-center justify-center border transition-colors cursor-pointer",
+                                isChecked || isIndeterminate ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 bg-white text-transparent hover:border-gray-400"
+                              )}
+                            >
+                              {isChecked && <Check size={12} strokeWidth={3} />}
+                              {isIndeterminate && <Minus size={12} strokeWidth={3} />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Middle Column: Floors (2nd Level) */}
+                  <div className="w-[320px] bg-white border-r border-gray-100 flex flex-col shrink-0">
+                    <div className="p-3 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                      <h4 className="text-gray-900 font-bold text-sm">选择楼层</h4>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3 space-y-1.5 bg-gray-50/30">
+                      {threeDFloorOptions.map(f => {
+                        const isChecked = threeDCheckedIds.includes(f.id);
+                        const isIndeterminate = isThreeDNodeIndeterminate(f.id);
+                        const isViewing = threeDViewingFloorId === f.id;
+                        return (
+                          <div 
+                            key={f.id}
+                            onClick={() => {
+                              setThreeDViewingFloorId(f.id);
+                            }}
+                            className={cn(
+                              "flex items-center gap-2 p-2.5 rounded-lg border transition-all cursor-pointer group bg-white",
+                              isViewing 
+                                ? "border-brand-300 bg-brand-50/30" 
+                                : "border-gray-200 hover:border-brand-200"
+                            )}
+                          >
+                            <div 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleThreeDCheckToggle(f.id, !isChecked);
+                              }}
+                              className={cn(
+                                "w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 cursor-pointer",
+                                isChecked || isIndeterminate ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 bg-white text-transparent hover:border-gray-400"
+                              )}
+                            >
+                              {isChecked && <Check size={12} strokeWidth={3} />}
+                              {isIndeterminate && <Minus size={12} strokeWidth={3} />}
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">{f.name}</span>
+                          </div>
+                        );
+                      })}
+                      {threeDFloorOptions.length === 0 && (
+                        <div className="text-center py-6 text-sm text-gray-400">
+                          该楼栋下暂无楼层
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right Column: Components (3rd Level) */}
+                  <div className="flex-1 flex flex-col bg-white overflow-hidden">
+                    <div className="p-3 border-b border-gray-100 bg-gray-50/50 shrink-0">
+                      <h4 className="text-gray-900 font-bold text-sm">选择构件</h4>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-3 space-y-1.5 bg-gray-50/50">
+                      {threeDComponentOptions.map(c => {
+                        const isChecked = threeDCheckedIds.includes(c.id);
+                        return (
+                          <div 
+                            key={c.id}
+                            onClick={() => {
+                              handleThreeDCheckToggle(c.id, !isChecked);
+                            }}
+                            className={cn(
+                              "flex items-center gap-2 p-2.5 rounded-lg border transition-all cursor-pointer group bg-white",
+                              isChecked 
+                                ? "border-brand-300 bg-brand-50/30" 
+                                : "border-gray-200 hover:border-brand-200"
+                            )}
+                          >
+                            <div className={cn(
+                              "w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                              isChecked ? "bg-brand-600 border-brand-600 text-white" : "border-gray-300 bg-white text-transparent group-hover:border-gray-400"
+                            )}>
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                            <span className="text-sm font-medium text-gray-700">{c.name}</span>
+                          </div>
+                        );
+                      })}
+                      {threeDComponentOptions.length === 0 && (
+                        <div className="text-center py-6 text-sm text-gray-400">
+                          该楼层下暂无构件
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
+                  <button
+                    onClick={() => setIs3DEntryDialogOpen(false)}
+                    className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleConfirmDialogAction}
+                    className="px-8 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm"
+                  >
+                    {dialogMode === '3d' ? '进入3D模式' : '开始计算'}
+                  </button>
                 </div>
               </motion.div>
             </div>
