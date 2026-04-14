@@ -1106,7 +1106,7 @@ export default function ProjectDetail() {
   const [threeDCheckedIds, setThreeDCheckedIds] = useState<string[]>([]);
   const [threeDViewingBuildingId, setThreeDViewingBuildingId] = useState<string>('');
   const [threeDViewingFloorId, setThreeDViewingFloorId] = useState<string>('');
-  const [dialogMode, setDialogMode] = useState<'3d' | 'calculate'>('3d');
+  const [dialogMode, setDialogMode] = useState<'3d' | 'calculate' | 'export'>('3d');
   const [isPlanContourModalOpen, setIsPlanContourModalOpen] = useState(false);
   const [is2DUnderlayVisible, setIs2DUnderlayVisible] = useState(true);
   const [isShadowVisible, setIsShadowVisible] = useState(true);
@@ -1374,6 +1374,52 @@ export default function ProjectDetail() {
           }
         }
         currentParentId = getParentId(currentParentId);
+      }
+
+      return Array.from(next);
+    });
+  };
+
+  const handleSelectAllSimilarComponents = () => {
+    setThreeDCheckedIds(prev => {
+      const next = new Set(prev);
+      
+      // 1. Find all currently checked component types
+      const checkedTypes = new Set<string>();
+      
+      for (const b of buildings) {
+        for (const f of b.children || []) {
+          for (const c of f.children || []) {
+            if (next.has(c.id)) {
+              checkedTypes.add(c.name);
+            }
+          }
+        }
+      }
+
+      if (checkedTypes.size === 0) return prev;
+
+      // 2. Iterate again and check all components that match the types
+      for (const b of buildings) {
+        for (const f of b.children || []) {
+          for (const c of f.children || []) {
+            if (checkedTypes.has(c.name)) {
+              next.add(c.id);
+            }
+          }
+          
+          // 3. Cascade up for floor
+          const allComponentsChecked = (f.children || []).length > 0 && f.children!.every(c => next.has(c.id));
+          if (allComponentsChecked) {
+            next.add(f.id);
+          }
+        }
+        
+        // 4. Cascade up for building
+        const allFloorsChecked = (b.children || []).length > 0 && b.children!.every(f => next.has(f.id));
+        if (allFloorsChecked) {
+          next.add(b.id);
+        }
       }
 
       return Array.from(next);
@@ -2040,7 +2086,13 @@ export default function ProjectDetail() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="unt-button-primary px-3 py-1.5 text-sm flex items-center gap-2">
+          <button 
+            className="unt-button-primary px-3 py-1.5 text-sm flex items-center gap-2"
+            onClick={() => {
+              setDialogMode('export');
+              setIs3DEntryDialogOpen(true);
+            }}
+          >
             <Download size={16} />
             导出
           </button>
@@ -3614,7 +3666,10 @@ export default function ProjectDetail() {
                 )}
               </button>
               <button 
-                onClick={handleExport}
+                onClick={() => {
+                  setDialogMode('export');
+                  setIs3DEntryDialogOpen(true);
+                }}
                 disabled={!isCalculated || isCalculating}
                 className={cn(
                   "flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2",
@@ -3811,17 +3866,11 @@ export default function ProjectDetail() {
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
                   <div className="flex items-center gap-3">
                     <div className="w-1.5 h-5 bg-brand-600 rounded-full" />
-                    <h3 className="font-bold text-lg text-gray-900">{dialogMode === '3d' ? '3D模式展示范围' : '计算范围'}</h3>
+                    <h3 className="font-bold text-lg text-gray-900">
+                      {dialogMode === '3d' ? '3D模式展示范围' : dialogMode === 'export' ? '选择导出范围' : '计算范围'}
+                    </h3>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="relative w-64 group">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-brand-600 transition-colors" />
-                      <input 
-                        type="text" 
-                        placeholder="搜索展示项..." 
-                        className="w-full h-9 pl-9 pr-3 text-sm bg-gray-50 border border-transparent hover:border-gray-200 focus:bg-white focus:border-brand-300 focus:ring-2 focus:ring-brand-100 rounded-lg transition-all outline-none"
-                      />
-                    </div>
                     <button
                       onClick={() => setIs3DEntryDialogOpen(false)}
                       className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
@@ -3974,19 +4023,27 @@ export default function ProjectDetail() {
                 </div>
 
                 {/* Footer */}
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0">
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0">
                   <button
-                    onClick={() => setIs3DEntryDialogOpen(false)}
-                    className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    onClick={handleSelectAllSimilarComponents}
+                    className="px-6 py-2 bg-white border border-brand-600 text-brand-600 rounded-lg text-sm font-medium hover:bg-brand-50 transition-colors"
                   >
-                    取消
+                    全选同类构件
                   </button>
-                  <button
-                    onClick={handleConfirmDialogAction}
-                    className="px-8 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm"
-                  >
-                    {dialogMode === '3d' ? '进入3D模式' : '开始计算'}
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIs3DEntryDialogOpen(false)}
+                      className="px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleConfirmDialogAction}
+                      className="px-8 py-2 bg-brand-600 text-white rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm"
+                    >
+                      {dialogMode === '3d' ? '进入3D模式' : dialogMode === 'export' ? '确认导出' : '开始计算'}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             </div>
