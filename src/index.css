@@ -71,4 +71,13 @@
   .unt-badge {
     @apply px-2 py-0.5 rounded-2xl text-xs font-medium border;
   }
+
+  /* Table styles */
+  .unt-table-container {
+    @apply w-full overflow-auto;
+  }
+
+  table {
+    @apply border-collapse;
+  }
 }

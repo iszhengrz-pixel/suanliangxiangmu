@@ -225,7 +225,16 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div 
+      className="min-h-screen flex flex-col"
+      style={{
+        backgroundColor: '#F9FAFD',
+        backgroundImage: 'url(/home-bg.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
+    >
       {/* Header */}
       <header className="h-18 bg-white border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-20">
         <div className="flex items-center gap-3">
@@ -280,14 +289,6 @@ export default function Dashboard() {
 
       {/* Content */}
       <main className="flex-1 p-8 max-w-[1440px] mx-auto w-full space-y-8">
-        {/* Page Title */}
-        <div className="flex justify-between items-end">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-gray-900 tracking-tight">项目管理</h1>
-            <p className="text-gray-500 font-medium">欢迎回来，管理并监控您的建筑设计项目。</p>
-          </div>
-        </div>
-
         {/* Stats Row */}
         <div className="flex flex-wrap gap-6">
           <StatCard title="活跃项目" value="3" subtitle="本月新增 1 个" icon={LayoutGrid} />
@@ -346,35 +347,39 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Table Header */}
-          <div className="px-8 py-3 bg-gray-50 border-b border-gray-200 grid grid-cols-[280px_120px_120px_1fr_180px_160px] gap-6">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">项目名称/编号</span>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">项目类型</span>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DXF 文件</span>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">楼栋与楼层</span>
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">创建时间</span>
-            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">操作</div>
-          </div>
-
-          {/* Table Body */}
-          <div className="flex flex-col min-h-[200px]">
-            {filteredProjects.length > 0 ? (
-              filteredProjects.map((project, index) => (
-                <ProjectListItem 
-                  key={project.id} 
-                  project={project} 
-                  index={index}
-                  onDxfClick={setSelectedProjectForDxf}
-                  onBuildingsClick={setSelectedProjectForBuildings}
-                  onEditClick={handleEditProject}
-                />
-              ))
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center py-12 text-gray-500">
-                <Search size={40} className="text-gray-200 mb-3" />
-                <p className="text-sm font-medium">未找到匹配的项目</p>
+          <div className="unt-table-container">
+            <div className="min-w-[1000px]">
+              {/* Table Header */}
+              <div className="px-8 py-3 bg-gray-50 border-b border-gray-200 grid grid-cols-[280px_120px_120px_1fr_180px_160px] gap-6">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">项目名称/编号</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">项目类型</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">DXF 文件</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">楼栋与楼层</span>
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">创建时间</span>
+                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">操作</div>
               </div>
-            )}
+
+              {/* Table Body */}
+              <div className="flex flex-col min-h-[200px]">
+                {filteredProjects.length > 0 ? (
+                  filteredProjects.map((project, index) => (
+                    <ProjectListItem 
+                      key={project.id} 
+                      project={project} 
+                      index={index}
+                      onDxfClick={setSelectedProjectForDxf}
+                      onBuildingsClick={setSelectedProjectForBuildings}
+                      onEditClick={handleEditProject}
+                    />
+                  ))
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center py-12 text-gray-500">
+                    <Search size={40} className="text-gray-200 mb-3" />
+                    <p className="text-sm font-medium">未找到匹配的项目</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Table Pagination */}

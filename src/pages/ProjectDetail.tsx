@@ -2020,6 +2020,9 @@ export default function ProjectDetail() {
       }
       setIs3DMode(true);
       setIs3DEntryDialogOpen(false);
+    } else if (dialogMode === 'export') {
+      setIs3DEntryDialogOpen(false);
+      navigate(`/project/${id}/export`);
     } else {
       setIs3DEntryDialogOpen(false);
       executeCalculation();
